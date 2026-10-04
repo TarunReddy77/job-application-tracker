@@ -1,0 +1,10 @@
+{
+  "queries": ["ai engineer", "software engineer", "forward deployed engineer"],
+  "past_n_days": 2,
+  "workplace_types": null,
+  "seniority_levels": null,
+  "locations": null,
+  "max_pages": 12,
+  "max_in_email": 150,
+  "max_jd_fetches": 40
+}

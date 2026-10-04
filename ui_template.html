@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Job Tracker</title>
+<style>
+:root{--bg:#fafaf9;--fg:#1c1917;--mut:#78716c;--card:#fff;--bd:#e7e5e4;--ac:#2563eb}
+@media (prefers-color-scheme:dark){:root{--bg:#141413;--fg:#e7e5e4;--mut:#a8a29e;--card:#1c1b1a;--bd:#2e2c2a;--ac:#60a5fa}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:20px;margin:0}.sub{color:var(--mut);font-size:13px;margin:2px 0 16px}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+input,select,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:7px 9px;min-width:0}
+button{cursor:pointer}button:disabled{opacity:.4;cursor:default}
+.count{color:var(--mut);font-size:13px;margin:8px 0}
+.job{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
+.job:hover{border-color:var(--ac)}
+.job b{font-size:16px}.meta{color:var(--mut);font-size:13px;margin-top:3px}
+.tag{display:inline-block;border:1px solid var(--bd);border-radius:10px;padding:0 7px;font-size:12px;margin-right:4px}
+.pager{display:flex;gap:10px;align-items:center;justify-content:center;margin-top:16px}
+#modal{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;padding:12px}
+#modal.open{display:flex}
+.panel{background:var(--card);border-radius:10px;width:min(900px,100%);height:min(90vh,100%);display:flex;flex-direction:column}
+.ph{padding:14px 16px;border-bottom:1px solid var(--bd);display:flex;gap:12px;justify-content:space-between}
+.ph a{color:var(--ac)}
+iframe{flex:1;border:0;width:100%;background:#fff;border-radius:0 0 10px 10px}
+</style>
+</head>
+<body>
+<main>
+<h1>Job Tracker</h1>
+<div class="sub">Updated __UPDATED__ · <span id="total"></span> jobs collected from HiringCafe</div>
+<div class="filters">
+  <input id="q" type="search" placeholder="Search title / company…">
+  <input id="loc" type="search" placeholder="Location contains…">
+  <input id="pay" type="number" min="0" step="10000" placeholder="Min pay ($/yr)">
+  <select id="sen"><option value="">Any seniority</option></select>
+  <select id="wt"><option value="">Any workplace</option></select>
+  <select id="qry"><option value="">Any search query</option></select>
+  <select id="age"><option value="">Any date</option><option value="1">Last 24h</option><option value="3">Last 3 days</option><option value="7">Last 7 days</option></select>
+</div>
+<div class="count" id="count"></div>
+<div id="list"></div>
+<div class="pager"><button id="prev">← Prev</button><span id="pg"></span><button id="next">Next →</button></div>
+</main>
+<div id="modal"><div class="panel">
+  <div class="ph"><div><b id="mt"></b><div class="meta" id="mm"></div></div>
+  <div style="white-space:nowrap"><a id="ma" target="_blank" rel="noopener">Apply ↗</a> · <a id="mh" target="_blank" rel="noopener">HiringCafe ↗</a> · <button id="mc">Close</button></div></div>
+  <iframe id="mf" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+</div></div>
+<script>
+const JOBS=__JOBS__;
+const PER=25;let page=0,cur=[];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const k=v=>'$'+Math.round(v/1000)+'k';
+const pay=j=>j.pay_min&&j.pay_max?k(j.pay_min)+'–'+k(j.pay_max):(j.pay_min||j.pay_max)?k(j.pay_min||j.pay_max):'';
+const age=ms=>{if(!ms)return'';const h=(Date.now()-ms)/36e5;return h<48?Math.max(0,Math.round(h))+'h ago':Math.round(h/24)+'d ago'};
+function opts(sel,vals){[...new Set(vals.filter(Boolean))].sort().forEach(v=>sel.add(new Option(v,v)))}
+opts($('sen'),JOBS.map(j=>j.seniority));opts($('wt'),JOBS.map(j=>j.workplace_type));opts($('qry'),JOBS.flatMap(j=>j.queries));
+$('total').textContent=JOBS.length;
+function filter(){
+  const q=$('q').value.toLowerCase(),loc=$('loc').value.toLowerCase(),mp=+$('pay').value||0,
+    sen=$('sen').value,wt=$('wt').value,qry=$('qry').value,days=+$('age').value;
+  cur=JOBS.filter(j=>
+    (!q||((j.title||'')+' '+(j.company||'')).toLowerCase().includes(q))&&
+    (!loc||(j.location||'').toLowerCase().includes(loc))&&
+    (!mp||(j.pay_max||j.pay_min||0)>=mp)&&
+    (!sen||j.seniority===sen)&&(!wt||j.workplace_type===wt)&&(!qry||j.queries.includes(qry))&&
+    (!days||(j.published_ms&&Date.now()-j.published_ms<=days*864e5)));
+  page=0;render();
+}
+function render(){
+  const pages=Math.max(1,Math.ceil(cur.length/PER));
+  $('count').textContent=cur.length+' matching';
+  $('list').innerHTML=cur.slice(page*PER,(page+1)*PER).map(j=>`<div class="job" data-id="${esc(j.id)}">
+    <b>${esc(j.title)}</b> <span class="meta">· ${esc(j.company)}</span>
+    <div class="meta">${esc(j.location)} · ${esc(age(j.published_ms))}${pay(j)?' · '+esc(pay(j)):''}</div>
+    <div class="meta" style="margin-top:6px">${[j.workplace_type,j.seniority,j.role_type].filter(Boolean).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}${j.status&&j.status!=='new'?`<span class="tag">${esc(j.status)}</span>`:''}</div></div>`).join('');
+  $('pg').textContent=`Page ${page+1} of ${pages}`;
+  $('prev').disabled=page===0;$('next').disabled=page>=pages-1;
+}
+$('list').onclick=e=>{const el=e.target.closest('.job');if(!el)return;
+  const j=JOBS.find(x=>x.id===el.dataset.id);
+  $('mt').textContent=`${j.title} — ${j.company}`;
+  $('mm').textContent=[j.location,j.workplace_type,pay(j),age(j.published_ms)].filter(Boolean).join(' · ');
+  $('ma').href=j.apply_url||j.hc_url;$('mh').href=j.hc_url;
+  $('mf').srcdoc=`<base target="_blank"><style>body{font:14px/1.5 system-ui,sans-serif;padding:8px 18px;color:#222}</style>`+(j.description||'<p>Description unavailable — use the Apply link.</p>');
+  $('modal').classList.add('open');};
+const close=()=>{$('modal').classList.remove('open');$('mf').srcdoc=''};
+$('mc').onclick=close;$('modal').onclick=e=>{if(e.target.id==='modal')close()};
+document.onkeydown=e=>{if(e.key==='Escape')close()};
+$('prev').onclick=()=>{page--;render();scrollTo(0,0)};$('next').onclick=()=>{page++;render();scrollTo(0,0)};
+['q','loc','pay'].forEach(i=>$(i).oninput=filter);['sen','wt','qry','age'].forEach(i=>$(i).onchange=filter);
+filter();
+</script>
+</body>
+</html>
