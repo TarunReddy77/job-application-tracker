@@ -51,7 +51,8 @@ iframe{flex:1;border:0;width:100%;background:#fff;border-radius:0 0 10px 10px}
   <iframe id="mf" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
 </div></div>
 <script>
-const JOBS=__JOBS__;
+// Hide anything that requires a clearance (stored in the data, just not shown).
+const JOBS=__JOBS__.filter(j=>!j.clearance||j.clearance==='None');
 const PER=25;let page=0,cur=[];
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

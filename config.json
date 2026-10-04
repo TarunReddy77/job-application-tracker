@@ -1,8 +1,16 @@
 {
-  "queries": ["ai engineer", "software engineer", "forward deployed engineer"],
+  "queries": [
+    "ai engineer",
+    "software engineer",
+    "forward deployed engineer"
+  ],
   "past_n_days": 2,
   "workplace_types": null,
-  "seniority_levels": null,
+  "seniority_levels": [
+    "No Prior Experience Required",
+    "Entry Level",
+    "Mid Level"
+  ],
   "locations": null,
   "max_pages": 12,
   "max_in_email": 150,
